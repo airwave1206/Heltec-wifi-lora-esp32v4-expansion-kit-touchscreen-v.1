@@ -1,0 +1,72 @@
+# Heltec V4 Handheld Weather Station & Navigation Terminal
+
+An open-source, highly responsive handheld weather station built specifically for the **Heltec Wireless Tracker V4 (ESP32-S3)** paired with the **B2B Expansion Kit Touchscreen (Version 1)**. 
+
+After weeks of navigating undocumented pin layouts, hardwired power-gating sequences, and hardware-specific attenuation constraints, this codebase provides a stable, 100% working blueprint. It integrates environmental sensors, hybrid GPS/RTC atomic time sync, live battery tracking, localized weather forecasting, and a rich graphical user interface driven by **LVGL 9** and **EEZ Studio**.
+
+---
+
+## 🚀 Key Solved Hardware Challenges
+If you have struggled with the Heltec Wireless Tracker V4 hardware architecture, this project provides proven code solutions for:
+* **The Battery Percentage Flaw:** Fixes the common `0%` or `100% stuck` reading loop by properly configuring the internal resistor isolation gate (`GPIO 37` pulled `HIGH`), overriding internal ESP32-S3 software attenuation with native `analogReadMilliVolts()`, and scaling via the hardware's true `4.9x` divider math.
+* **Instant Zambretti Forecast Calibration:** Bypasses standard hour-long startup tracking blocks by implementing an accelerated buffer fill validation loop.
+* **Peripherals & Screen Power Delivery:** Properly latches the `VEXT` pin (`GPIO 36` to `LOW`) and the GPS power gate (`GPIO 34` to `LOW`) to comfortably drive external I2C hardware and the backlit TFT panel simultaneously.
+
+---
+
+## 🛠️ Hardware Stack
+1. **Mainboard:** Heltec Wireless Tracker V4 (ESP32-S3)
+2. **Display & Input:** Heltec B2B Expansion Kit Touchscreen V1 (ST7789 SPI TFT & CHSC6X Touch[I2C])
+3. **Sensors:** 
+   * Bosch **BME280** (Barometric Pressure, Temperature, Humidity)
+   * Sensirion **SHTC3** (High-precision Relative Humidity & Temperature)
+4. **Timekeeping:** Internal L76K GPS Module paired with an external **DS3231 RTC** module for secondary fallback.
+
+---
+
+## 🔌 Pin Map Reference (Heltec V4 Kit)
+
+| Peripheral component 	| Pin Name/Function | ESP32-S3 GPIO| Notes / Logic State 
+----------------------------------------------------------------------------------------------------------------------------
+| System Power Latch 	| VEXT_PIN 	    | 36 	   | Must be driven **LOW** to power TFT/I2C Rails 
+| Battery Gate Latch 	| ADC_CTRL_PIN 	    | 37 	   | Must be driven **HIGH** to engage divider 
+| Battery ADC Read 	| VBAT_READ_PIN     | 1 	   | Channel 0 Analog Input 
+| Weather I2C Bus 	| B2B_SDA / B2B_SCL | 4 / 3	   | Dedicated expansion kit sensor bus 
+| Touchscreen I2C Bus	| TOUCH_SDA / SCL   | 47 / 48	   | Wire1 Bus Instance 
+| Touch Interrupt / RST	| TOUCH_INT / RST   | 45 / 44 	   | Touch controller management lines 
+| TFT SPI Core Display	| CS / RST / DC     | 15 / 18 / 16 | ST7789 panel controller pins 
+| TFT Backlight Control	| TFT_BLK 	    | 21 	   | Driven **HIGH** for Screen Awake 
+| L76K GPS Module 	| RX / TX Pins 	    | 39 / 38 	   | Mounted to explicit Hardware `Serial1` 
+| GPS System Pins 	| EN/STANDBY / RST  | 34 / 40 / 42 | Configured for continuous active wake 
+| User Input & Sound 	| WAKE_BUTTON/BUZZER| 35 / 6 	   | Falling edge interrupt wake pin 
+
+---
+
+## 📚 Required Software Libraries
+Ensure you have the following libraries installed in your Arduino IDE before uploading:
+* `lvgl` (Version 9.x Core Framework)
+* `Adafruit_BME280` & `Adafruit_Sensor`
+* `SparkFun_SHTC3`
+* `TinyGPS++`
+* `RTClib` (By Adafruit)
+
+---
+
+## 🧠 System Architecture Highlights
+
+### 1. Hybrid Clock Synchronization
+The terminal boots instantly using the battery-backed **DS3231 RTC module** via the weather I2C bus (`Wire`). In the background, the **L76K GPS** streams satellite sentences via `Serial1`. The moment an outdoor satellite lock is established, the system uses the atomic GPS time payload to automatically adjust and update the drift on the DS3231 hardware.
+
+### 2. Multi-Unit UI Rendering & Local Forecasting
+The software extracts the user configuration directly from the display's global environment variables. It instantly recalculates float arrays into clean, two-decimal string objects tailored to the active unit preference:
+* **Metric System:** Displays data in **°C** and **hPa**.
+* **Imperial System:** Displays data in **°F** and **inHg**.
+
+The barometric pressure history is logged to a rolling memory array. A localized **Zambretti Trend Algorithm** tracks pressure differentials to update screen widgets with live status outputs (`Stable`, `Improving`, `Rain Ahead`, `Storm Warning!`) and triggers an acoustic buzzer alarm warning during severe pressure drops.
+
+---
+
+## 🤝 Contributing & Community
+This project was constructed to fill the documentation gaps surrounding the Heltec V4 B2B Touchscreen layout. If you find ways to optimize the panel refreshing speeds or add extra dashboard features, feel free to submit a Pull Request or share your modifications on the Heltec user forums!
+
+**Developed by Jim Hanna**
